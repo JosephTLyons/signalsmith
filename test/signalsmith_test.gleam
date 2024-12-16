@@ -1,7 +1,7 @@
 import gleeunit
 import gleeunit/should
 import signalsmith.{
-  OneEighty, Zero, cosine, sine, square, take, to_list, triangle,
+  Ninety, OneEighty, Zero, cosine, sine, square, take, to_list, triangle,
 }
 
 pub fn main() {
@@ -38,6 +38,20 @@ pub fn sine_8_test() {
   { b >. 0.0 && b <. 50.0 } |> should.be_true()
   { c >. -50.0 && c <. 0.0 } |> should.be_true()
   { d >. -50.0 && d <. 0.0 } |> should.be_true()
+}
+
+pub fn sine_8_90_test() {
+  let samples =
+    sine(amplitude: 50.0, samples_per_period: 8, phase: Ninety)
+    |> take(8)
+    |> to_list
+
+  let assert [50.0, a, 0.0, b, -50.0, c, 0.0, d] = samples
+
+  { a >. 0.0 && a <. 50.0 } |> should.be_true()
+  { b <. 0.0 && b <. 50.0 } |> should.be_true()
+  { c >. -50.0 && c <. 0.0 } |> should.be_true()
+  { d <. 50.0 && d >. 0.0 } |> should.be_true()
 }
 
 // ------------------ Cosine

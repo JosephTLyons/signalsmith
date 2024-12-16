@@ -24,33 +24,6 @@ pub fn main() {
   |> io.debug
 }
 
-// pub fn sine_from_frequency(
-//   amplitude: Float,
-//   frequency: Float,
-//   sample_rate: Float,
-//   initial_phase: Float,
-// ) -> yielder.Yielder(Float) {
-//   let samples_per_period = sample_rate /. frequency
-//   sine(amplitude, samples_per_period, initial_phase)
-// }
-
-// pub fn sine(
-//   amplitude amplitude: Float,
-//   samples_per_period samples_per_period: Float,
-//   initial_phase initial_phase: Float,
-// ) -> yielder.Yielder(Float) {
-//   let assert Ok(t) =
-//     sequences.linear_space(
-//       0.0,
-//       2.0 *. pi(),
-//       float.truncate(samples_per_period),
-//       False,
-//     )
-//   let waveform = t |> list.map(fn(x) { amplitude *. sin(x +. initial_phase) })
-
-//   yielder.from_list(waveform) |> yielder.cycle
-// }
-
 pub fn sine(
   amplitude amplitude: Float,
   samples_per_period samples_per_period: Int,
@@ -64,9 +37,8 @@ pub fn cosine(
   samples_per_period samples_per_period: Int,
   phase phase: Phase,
 ) -> yielder.Yielder(Float) {
-  let samples_to_drop = samples_per_period / 4
-  n(amplitude:, samples_per_period:, phase:, transform: sin)
-  |> yielder.drop(samples_to_drop)
+  let phase = add_phase(phase, Ninety)
+  n(amplitude:, samples_per_period:, phase: phase, transform: sin)
 }
 
 pub fn square(
@@ -89,6 +61,28 @@ pub fn triangle(
       False -> -4.0 *. normalized_x +. 3.0
     }
   })
+}
+
+fn phase_value(phase: Phase) -> Int {
+  case phase {
+    Zero -> 0
+    Ninety -> 1
+    OneEighty -> 2
+    TwoSeventy -> 3
+  }
+}
+
+fn add_phase(phase_a: Phase, phase_b: Phase) -> Phase {
+  let phase_a_value = phase_value(phase_a)
+  let phase_b_value = phase_value(phase_b)
+  let sum = phase_a_value + phase_b_value
+  let result = sum % 4
+  case result {
+    0 -> Zero
+    1 -> Ninety
+    2 -> OneEighty
+    _ -> TwoSeventy
+  }
 }
 
 // TODO: Rename
@@ -120,8 +114,13 @@ fn n(
       case phase {
         Zero ->
           half_cycle |> yielder.append(negated_half_cycle) |> yielder.cycle
-        Ninety ->
-          half_cycle |> yielder.append(negated_half_cycle) |> yielder.cycle
+        Ninety -> {
+          let samples_to_drop = samples_per_period / 4
+          half_cycle
+          |> yielder.append(negated_half_cycle)
+          |> yielder.cycle
+          |> yielder.drop(samples_to_drop)
+        }
         TwoSeventy ->
           negated_half_cycle
           |> yielder.append(half_cycle)
@@ -134,71 +133,6 @@ fn n(
     }
   }
 }
-
-// pub fn square(
-//   amplitude amplitude: Float,
-//   samples_per_period samples_per_period: Int,
-//   initial_phase initial_phase: Float,
-// ) -> yielder.Yielder(Float) {
-//   let half_period = samples_per_period / 2
-//   let positive = yielder.repeat(amplitude, half_period)
-//   let negative = yielder.repeat(-amplitude, half_period)
-
-//   let full_cycle = positive |> yielder.append(negative)
-
-//   // Apply initial phase
-//   let phase_samples =
-//     int.floor(
-//       initial_phase /. { 2.0 *. pi() } *. int.to_float(samples_per_period),
-//     )
-//   let rotated_cycle =
-//     full_cycle
-//     |> yielder.drop(phase_samples)
-//     |> yielder.append(full_cycle |> yielder.take(phase_samples))
-
-//   rotated_cycle |> yielder.cycle
-// }
-
-// pub fn sine(
-//   amplitude: Float,
-//   samples_per_period: Int,
-//   initial_phase: Float,
-// ) -> yielder.Yielder(Float) {
-//   let quarter_samples = float.floor(samples_per_period /. 4.0)
-//   let half_pi = pi() /. 2.0
-
-//   // Generate the four quadrants
-//   let assert Ok(q1) =
-//     sequences.linear_space(0.0, half_pi, float.truncate(quarter_samples), False)
-//   let assert Ok(q2) =
-//     sequences.linear_space(
-//       half_pi,
-//       pi(),
-//       float.truncate(quarter_samples),
-//       False,
-//     )
-//   let assert Ok(q3) =
-//     sequences.linear_space(
-//       pi(),
-//       1.5 *. pi(),
-//       float.truncate(quarter_samples),
-//       False,
-//     )
-//   let assert Ok(q4) =
-//     sequences.linear_space(
-//       1.5 *. pi(),
-//       2.0 *. pi(),
-//       float.truncate(quarter_samples +. 1.0),
-//       True,
-//     )
-
-//   // Combine quadrants and apply sine function
-//   let waveform =
-//     list.flatten([q1, q2, q3, q4])
-//     |> list.map(fn(phase) { amplitude *. sin(phase +. initial_phase) })
-
-//   yielder.from_list(waveform) |> yielder.cycle
-// }
 
 pub fn take(yielder: yielder.Yielder(Float), n: Int) -> yielder.Yielder(Float) {
   yielder |> yielder.take(n)
