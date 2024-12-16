@@ -1,5 +1,3 @@
-import gleam/float
-import gleam/int
 import gleam/io
 import gleam/list
 import gleam/option.{None, Some}
@@ -8,12 +6,18 @@ import gleam_community/maths/elementary.{pi, sin}
 import gleam_community/maths/piecewise
 import gleam_community/maths/sequences
 
+pub type Phase {
+  Zero
+  Ninety
+  OneEighty
+  TwoSeventy
+}
+
 pub fn main() {
   let amplitude = 5.0
   let samples_per_period = 16
-  let initial_phase = 0.0
 
-  square(amplitude:, samples_per_period:, initial_phase:)
+  triangle(amplitude:, samples_per_period:, phase: Zero)
   |> take(2 * samples_per_period)
   |> to_list
   |> list.try_map(fn(a) { a |> piecewise.round(Some(5), None) })
@@ -50,28 +54,50 @@ pub fn main() {
 pub fn sine(
   amplitude amplitude: Float,
   samples_per_period samples_per_period: Int,
-  initial_phase initial_phase: Float,
+  phase phase: Phase,
 ) -> yielder.Yielder(Float) {
-  n(samples_per_period, initial_phase, fn(sample) {
-    amplitude *. sin(sample +. initial_phase)
-  })
+  n(amplitude:, samples_per_period:, phase:, transform: sin)
+}
+
+pub fn cosine(
+  amplitude amplitude: Float,
+  samples_per_period samples_per_period: Int,
+  phase phase: Phase,
+) -> yielder.Yielder(Float) {
+  let samples_to_drop = samples_per_period / 4
+  n(amplitude:, samples_per_period:, phase:, transform: sin)
+  |> yielder.drop(samples_to_drop)
 }
 
 pub fn square(
   amplitude amplitude: Float,
   samples_per_period samples_per_period: Int,
-  initial_phase initial_phase: Float,
+  phase phase: Phase,
 ) -> yielder.Yielder(Float) {
-  n(samples_per_period, initial_phase, fn(_) { amplitude +. initial_phase })
+  n(amplitude:, samples_per_period:, phase:, transform: fn(_) { amplitude })
+}
+
+pub fn triangle(
+  amplitude amplitude: Float,
+  samples_per_period samples_per_period: Int,
+  phase phase: Phase,
+) -> yielder.Yielder(Float) {
+  n(amplitude:, samples_per_period:, phase:, transform: fn(x) {
+    let normalized_x = x /. pi()
+    case normalized_x <. 0.5 {
+      True -> 4.0 *. normalized_x -. 1.0
+      False -> -4.0 *. normalized_x +. 3.0
+    }
+  })
 }
 
 // TODO: Rename
 fn n(
+  amplitude amplitude: Float,
   samples_per_period samples_per_period: Int,
-  initial_phase initial_phase: Float,
+  phase phase: Phase,
   transform transform: fn(Float) -> Float,
 ) {
-  // let phase_shift = initial_phase /. { 2.0 *. pi() }
   let angles = sequences.linear_space(0.0, pi(), samples_per_period / 2, False)
 
   case angles {
@@ -79,14 +105,8 @@ fn n(
     Ok(angles) -> {
       let half_cycle =
         angles
-        |> list.map(transform)
+        |> list.map(fn(sample) { amplitude *. transform(sample) })
         |> yielder.from_list
-
-      // let half_cycle =
-      //   half_cycle
-      //   |> yielder.drop(float.truncate(
-      //     phase_shift *. int.to_float(samples_per_period),
-      //   ))
 
       let negated_half_cycle =
         half_cycle
@@ -97,7 +117,20 @@ fn n(
           }
         })
 
-      half_cycle |> yielder.append(negated_half_cycle) |> yielder.cycle
+      case phase {
+        Zero ->
+          half_cycle |> yielder.append(negated_half_cycle) |> yielder.cycle
+        Ninety ->
+          half_cycle |> yielder.append(negated_half_cycle) |> yielder.cycle
+        TwoSeventy ->
+          negated_half_cycle
+          |> yielder.append(half_cycle)
+          |> yielder.cycle
+        OneEighty ->
+          negated_half_cycle
+          |> yielder.append(half_cycle)
+          |> yielder.cycle
+      }
     }
   }
 }
@@ -199,13 +232,13 @@ pub fn to_list(yielder: yielder.Yielder(Float)) -> List(Float) {
 // TODO: Birdie
 // TODO: Labels
 
-// 1. Square Wave: Alternates between two fixed values.
 // 2. Sawtooth Wave: Ramps up linearly and then drops sharply.
 // 3. Triangle Wave: Ramps up linearly, then down linearly.
 // 4. Pulse Wave: Similar to square wave but with adjustable duty cycle.
 // 5. White Noise: Random signal with constant power spectral density.
 // 6. Pink Noise: Noise with power spectral density inversely proportional to frequency.
 // 7. Brown Noise: Noise with power spectral density inversely proportional to frequency squared.
+// ---
 // 8. Chirp: A signal that increases or decreases in frequency over time.
 // 9. AM (Amplitude Modulated) Signal: A carrier signal modulated by another signal.
 // 10. FM (Frequency Modulated) Signal: A carrier signal whose frequency is modulated by another signal.
